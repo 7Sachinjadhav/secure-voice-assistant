@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import { Shield, Mic, Smartphone, Lock, Mail, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +17,6 @@ const Login = () => {
   const [password, setPassword] = useState("");
 
   useEffect(() => {
-    // Check if user is already logged in
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
@@ -27,7 +25,6 @@ const Login = () => {
     };
     checkUser();
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (session) {
@@ -145,66 +142,41 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden bg-background">
       {/* Background effects */}
       <div className="absolute inset-0 grid-pattern opacity-30" />
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl" />
 
       {/* Main content */}
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="relative z-10 w-full max-w-md"
-      >
+      <div className="relative z-10 w-full max-w-md animate-fade-in">
         {/* Logo and title */}
         <div className="text-center mb-8">
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-            className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-accent mb-6 shadow-lg"
-          >
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-accent mb-6 shadow-lg">
             <Shield className="w-10 h-10 text-primary-foreground" />
-          </motion.div>
+          </div>
           
-          <motion.h1
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="text-3xl font-bold mb-2"
-          >
+          <h1 className="text-3xl font-bold mb-2">
             <span className="gradient-text">Voice-Controlled</span>
             <br />
-            Secure Assistant
-          </motion.h1>
+            <span className="text-foreground">Secure Assistant</span>
+          </h1>
           
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="text-muted-foreground"
-          >
+          <p className="text-muted-foreground">
             Your AI-powered Android companion
-          </motion.p>
+          </p>
         </div>
 
         {/* Login card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="glass-card p-8"
-        >
-          <h2 className="text-xl font-semibold text-center mb-6">
+        <div className="glass-card p-8">
+          <h2 className="text-xl font-semibold text-center mb-6 text-foreground">
             {isSignUp ? "Create Account" : "Sign In"}
           </h2>
 
           {/* Email/Password Form */}
           <form onSubmit={handleEmailAuth} className="space-y-4 mb-6">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-foreground">Email</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
@@ -213,13 +185,13 @@ const Login = () => {
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 bg-secondary/50 border-border"
+                  className="pl-10 bg-secondary/50 border-border text-foreground"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-foreground">Password</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
@@ -228,7 +200,7 @@ const Login = () => {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10 bg-secondary/50 border-border"
+                  className="pl-10 pr-10 bg-secondary/50 border-border text-foreground"
                 />
                 <button
                   type="button"
@@ -249,11 +221,7 @@ const Login = () => {
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full"
-                  />
+                  <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
                   {isSignUp ? "Creating Account..." : "Signing In..."}
                 </span>
               ) : (
@@ -332,33 +300,25 @@ const Login = () => {
               By signing in, you agree to our Terms of Service and Privacy Policy
             </p>
           </div>
-        </motion.div>
+        </div>
 
         {/* Features preview */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.7 }}
-          className="mt-8 grid grid-cols-3 gap-4"
-        >
+        <div className="mt-8 grid grid-cols-3 gap-4">
           {[
             { icon: Mic, label: "Voice Control" },
             { icon: Lock, label: "Secure Auth" },
             { icon: Smartphone, label: "Device Control" },
-          ].map((feature, index) => (
-            <motion.div
+          ].map((feature) => (
+            <div
               key={feature.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 + index * 0.1 }}
               className="flex flex-col items-center gap-2 p-3 rounded-xl bg-card/50 border border-border/50"
             >
               <feature.icon className="w-5 h-5 text-primary" />
               <span className="text-xs text-muted-foreground">{feature.label}</span>
-            </motion.div>
+            </div>
           ))}
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
     </div>
   );
 };
