@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.4a5c7a33aad749e1a67d664b7bba8f37',
+  appId: 'app.lovable.voiceassistant',
   appName: 'Voice Assistant',
   webDir: 'dist',
   server: {
