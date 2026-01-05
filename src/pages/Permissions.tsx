@@ -22,6 +22,7 @@ interface Permission {
   description: string;
   purpose: string;
   granted: boolean;
+  androidPermissions?: string[];
 }
 
 const initialPermissions: Permission[] = [
@@ -32,6 +33,7 @@ const initialPermissions: Permission[] = [
     description: "Access to your device microphone",
     purpose: "Required to listen to voice commands and recognize your voice",
     granted: false,
+    androidPermissions: ["android.permission.RECORD_AUDIO"],
   },
   {
     id: "phone",
@@ -40,6 +42,7 @@ const initialPermissions: Permission[] = [
     description: "Make and manage phone calls",
     purpose: "Required to make calls using voice commands",
     granted: false,
+    androidPermissions: ["android.permission.CALL_PHONE", "android.permission.READ_PHONE_STATE"],
   },
   {
     id: "sms",
@@ -48,6 +51,7 @@ const initialPermissions: Permission[] = [
     description: "Send and read text messages",
     purpose: "Required to send messages using voice commands",
     granted: false,
+    androidPermissions: ["android.permission.SEND_SMS", "android.permission.READ_SMS"],
   },
   {
     id: "contacts",
@@ -56,6 +60,7 @@ const initialPermissions: Permission[] = [
     description: "Access your contact list",
     purpose: "Required to identify contact names when making calls or sending messages",
     granted: false,
+    androidPermissions: ["android.permission.READ_CONTACTS", "android.permission.WRITE_CONTACTS"],
   },
   {
     id: "admin",
@@ -64,39 +69,48 @@ const initialPermissions: Permission[] = [
     description: "Device administrator access",
     purpose: "Required to lock the phone using voice commands",
     granted: false,
+    androidPermissions: [],
   },
 ];
 
-// Function to request real microphone permission
-const requestMicrophonePermission = async (): Promise<boolean> => {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    // Stop all tracks after getting permission
-    stream.getTracks().forEach(track => track.stop());
-    return true;
-  } catch (error) {
-    console.error("Microphone permission denied:", error);
-    return false;
-  }
-};
-
-// Function to open app settings on Android
-const openAppSettings = () => {
-  if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
-    // Use Android intent to open app settings
-    const packageName = 'app.lovable.voiceassistant';
-    (window as any).open(`intent://settings/app_details?package=${packageName}#Intent;scheme=android-app;end`);
-    
-    // Fallback: try opening general settings
-    try {
-      (window as any).Android?.openAppSettings?.();
-    } catch (e) {
-      // If native bridge not available, use Capacitor App plugin
-      import('@capacitor/app').then(({ App }) => {
-        // App plugin doesn't have openSettings, so we'll use a workaround
-        window.location.href = `intent:#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;data=package:${packageName};end`;
-      }).catch(console.error);
+// Request Android permission using native plugin
+const requestAndroidPermission = async (permissionType: string): Promise<boolean> => {
+  if (!Capacitor.isNativePlatform()) {
+    // For web testing, use Web APIs where available
+    if (permissionType === 'microphone') {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop());
+        return true;
+      } catch {
+        return false;
+      }
     }
+    // Simulate for other permissions on web
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return true;
+  }
+
+  try {
+    // Call our native PermissionsPlugin via Capacitor bridge
+    const AppPermissions = (window as any).Capacitor?.Plugins?.AppPermissions;
+    
+    if (AppPermissions) {
+      const result = await AppPermissions.requestPermission({ type: permissionType });
+      return result?.granted === true;
+    }
+    
+    // Fallback for microphone using Web API (triggers native dialog)
+    if (permissionType === 'microphone') {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop());
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error("Permission request failed:", error);
+    return false;
   }
 };
 
@@ -128,30 +142,16 @@ const Permissions = () => {
     const permissionId = currentPermission.id;
 
     try {
-      if (permissionId === "microphone") {
-        // Request real microphone permission using Web API
-        granted = await requestMicrophonePermission();
+      if (permissionId !== "admin") {
+        // Request permissions using our native function
+        granted = await requestAndroidPermission(permissionId);
       } else {
-        // For other permissions (phone, sms, contacts, admin), 
-        // open app settings so user can grant them manually
-        if (Capacitor.isNativePlatform()) {
-          // Open Android app settings
-          const packageName = 'app.lovable.voiceassistant';
-          
-          // Create an intent URL to open app settings
-          const intentUrl = `intent:#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;data=package:${packageName};S.browser_fallback_url=https://play.google.com/store;end`;
-          
-          // Try to open using window.location
-          window.location.href = intentUrl;
-          
-          // Wait for user to return from settings
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          // Assume granted after user returns (in production, you'd check the actual permission status)
-          granted = true;
-        } else {
-          // For web testing, simulate the permission grant
-          await new Promise(resolve => setTimeout(resolve, 1000));
+        // For Device Admin, we need special handling
+        if (currentPermission.id === "admin") {
+          // Device Admin requires special enrollment, for now just simulate
+          if (!Capacitor.isNativePlatform()) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
           granted = true;
         }
       }
