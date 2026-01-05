@@ -24,6 +24,17 @@ allprojects {
     }
 }
 
-task clean(type: Delete) {
-    delete rootProject.buildDir
+// Force Java 17 bytecode so builds work even if the local JDK is < 21.
+// This also overrides Capacitor's generated compileOptions.
+subprojects { p ->
+    afterEvaluate {
+        if (p.plugins.hasPlugin('com.android.application') || p.plugins.hasPlugin('com.android.library')) {
+            p.android {
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+            }
+        }
+    }
 }
