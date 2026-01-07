@@ -135,46 +135,61 @@ const Permissions = () => {
   const allGranted = permissions.every(p => p.granted);
   const grantedCount = permissions.filter(p => p.granted).length;
 
-  const handleGrantPermission = async () => {
-    setIsGranting(true);
-    
-    let granted = false;
-    const permissionId = currentPermission.id;
+ const handleGrantPermission = async () => {
+  setIsGranting(true);
 
-    try {
-      if (permissionId !== "admin") {
-        // Request permissions using our native function
-        granted = await requestAndroidPermission(permissionId);
-      } else {
-        // For Device Admin, we need special handling
-        if (currentPermission.id === "admin") {
-          // Device Admin requires special enrollment, for now just simulate
-          if (!Capacitor.isNativePlatform()) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+  let granted = false;
+  const permissionId = currentPermission.id;
+
+  try {
+    if (permissionId !== "admin") {
+      // ✅ KEEP EXISTING BEHAVIOR FOR OTHER 4 PERMISSIONS
+      granted = await requestAndroidPermission(permissionId);
+    } else {
+      // ✅ REAL DEVICE ADMIN FLOW (NO FAKE GRANT)
+
+      if (Capacitor.isNativePlatform()) {
+        const AppPermissions = (window as any).Capacitor?.Plugins?.AppPermissions;
+
+        if (AppPermissions?.requestDeviceAdmin) {
+          // Open Android Device Admin settings screen
+          await AppPermissions.requestDeviceAdmin();
+
+          // 🔴 ADDITION STARTS HERE (ONLY THIS PART)
+          // wait for user to return from settings
+          await new Promise(res => setTimeout(res, 500));
+
+          if (AppPermissions?.isDeviceAdminEnabled) {
+            const status = await AppPermissions.isDeviceAdminEnabled();
+            if (status?.enabled === true) {
+              granted = true;
+            }
           }
-          granted = true;
+          // 🔴 ADDITION ENDS HERE
         }
       }
-    } catch (error) {
-      console.error("Permission request error:", error);
-      granted = false;
     }
+  } catch (error) {
+    console.error("Permission request error:", error);
+    granted = false;
+  }
 
-    if (granted) {
-      setPermissions(prev => 
-        prev.map((p, i) => 
-          i === currentIndex ? { ...p, granted: true } : p
-        )
-      );
+  if (granted) {
+    setPermissions(prev =>
+      prev.map((p, i) =>
+        i === currentIndex ? { ...p, granted: true } : p
+      )
+    );
 
-      // Move to next permission or finish
-      if (currentIndex < permissions.length - 1) {
-        setTimeout(() => setCurrentIndex(prev => prev + 1), 500);
-      }
+    if (currentIndex < permissions.length - 1) {
+      setTimeout(() => setCurrentIndex(prev => prev + 1), 500);
     }
+  }
 
-    setIsGranting(false);
-  };
+  setIsGranting(false);
+};
+
+
 
   const handleContinue = () => {
     navigate("/voice-registration");

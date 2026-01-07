@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mic, MicOff, CheckCircle2, ChevronRight, AlertCircle } from "lucide-react";
+import { Mic, CheckCircle2, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -10,159 +10,112 @@ type RecordingState = "idle" | "recording" | "processing" | "complete";
 const VoiceRegistration = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [recordingState, setRecordingState] = useState<RecordingState>("idle");
-  const [audioLevel, setAudioLevel] = useState(0);
+  const [recordingState, setRecordingState] =
+    useState<RecordingState>("idle");
 
-  const animationRef = useRef<number>();
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) navigate("/");
-    };
-    checkAuth();
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) navigate("/");
+    });
 
     return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-      if (audioContextRef.current) audioContextRef.current.close();
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
     };
   }, [navigate]);
 
-  const startRecording = async () => {
-  try {
-    // 1️⃣ Mic access
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-    });
+  const startRecording = () => {
+    try {
+      const SpeechRecognition =
+        (window as any).webkitSpeechRecognition ||
+        (window as any).SpeechRecognition;
 
-    streamRef.current = stream;
-
-    // 2️⃣ Audio context (for animation)
-    const audioContext = new AudioContext();
-    audioContextRef.current = audioContext;
-
-    const analyser = audioContext.createAnalyser();
-    analyser.fftSize = 256;
-    analyserRef.current = analyser;
-
-    const source = audioContext.createMediaStreamSource(stream);
-    source.connect(analyser);
-
-    setRecordingState("recording");
-
-    // 🔊 Animation loop
-    const updateAudioLevel = () => {
-      if (!analyserRef.current) return;
-      const data = new Uint8Array(analyserRef.current.frequencyBinCount);
-      analyserRef.current.getByteFrequencyData(data);
-      const avg = data.reduce((a, b) => a + b, 0) / data.length;
-      setAudioLevel(avg / 255);
-      animationRef.current = requestAnimationFrame(updateAudioLevel);
-    };
-    updateAudioLevel();
-
-    // 3️⃣ Speech Recognition (KEY PART)
-    const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      throw new Error("Speech recognition not supported");
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-IN";
-    recognition.continuous = true;
-    recognition.interimResults = false;
-
-    recognition.onresult = (event: any) => {
-      const text = event.results[event.results.length - 1][0]
-        .transcript
-        .toLowerCase()
-        .trim();
-
-      console.log("Heard:", text);
-
-      // ✅ ONLY stop on "hey sri"
-      if (text === "hey sri") {
-        recognition.stop();
-        stream.getTracks().forEach(t => t.stop());
-        cancelAnimationFrame(animationRef.current!);
-
-        setRecordingState("processing");
-
-        setTimeout(() => {
-          toast({
-            title: "Voice Registered",
-            description: 'Wake word "Hey Sri" detected successfully.',
-          });
-          setRecordingState("complete");
-        }, 1200);
+      if (!SpeechRecognition) {
+        throw new Error("SpeechRecognition not supported");
       }
-    };
 
-    recognition.start();
-  } catch (error) {
-    console.error(error);
-    toast({
-      variant: "destructive",
-      title: "Microphone Error",
-      description: "Unable to access microphone or speech recognition.",
-    });
-    setRecordingState("idle");
-  }
-};
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
 
+      recognition.lang = "en-IN";
+      recognition.interimResults = false;
+      recognition.continuous = false; // ✅ SAME AS YESTERDAY
 
-      mediaRecorder.start();
       setRecordingState("recording");
 
-      const updateAudioLevel = () => {
-        if (!analyserRef.current) return;
-        const data = new Uint8Array(analyserRef.current.frequencyBinCount);
-        analyserRef.current.getByteFrequencyData(data);
-        const avg = data.reduce((a, b) => a + b) / data.length;
-        setAudioLevel(avg / 255);
-        animationRef.current = requestAnimationFrame(updateAudioLevel);
-      };
-      updateAudioLevel();
+      recognition.onresult = (event: any) => {
+        const text = event.results[0][0].transcript
+          .toLowerCase()
+          .trim();
 
-      setTimeout(() => {
-        if (mediaRecorderRef.current?.state === "recording") {
-          mediaRecorderRef.current.stop();
+        console.log("Heard:", text);
+
+        if (text.includes("hey sri")) {
+          recognition.stop();
+          setRecordingState("processing");
+
+          setTimeout(() => {
+            toast({
+              title: "Voice Registered",
+              description: 'Wake word "Hey Sri" detected successfully.',
+            });
+            setRecordingState("complete");
+          }, 800);
+        } else {
+          recognition.stop();
+          toast({
+            variant: "destructive",
+            title: "Try again",
+            description: 'Please say "Hey Sri" clearly',
+          });
+          setRecordingState("idle");
         }
-      }, 3000);
+      };
 
-    } catch (error: any) {
-      console.error(error);
+      recognition.onerror = () => {
+        setRecordingState("idle");
+      };
+
+      recognition.start();
+    } catch (err) {
+      console.error(err);
       toast({
         variant: "destructive",
         title: "Microphone Error",
-        description: "Microphone permission denied. Please allow it in settings.",
+        description: "Speech recognition failed.",
       });
       setRecordingState("idle");
     }
   };
 
-  const handleContinue = () => navigate("/about");
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-background">
       <div className="w-full max-w-md text-center">
         <h1 className="text-2xl font-bold mb-2">Voice Registration</h1>
+
         <p className="text-muted-foreground mb-6">
-          Please provide your voice. You are the owner of this device.
+          You are the owner of this device. Say{" "}
+          <span className="font-semibold text-primary">“Hey Sri”</span>
         </p>
+
+        <div className="flex justify-center mb-6">
+          <div
+            className={`w-32 h-32 rounded-full flex items-center justify-center
+              ${recordingState === "recording"
+                ? "bg-primary/20 animate-pulse"
+                : "bg-muted"}
+            `}
+          >
+            {recordingState === "complete" ? (
+              <CheckCircle2 className="w-12 h-12 text-green-500" />
+            ) : (
+              <Mic className="w-12 h-12 text-primary" />
+            )}
+          </div>
+        </div>
 
         {recordingState === "idle" && (
           <Button onClick={startRecording} className="w-full">
@@ -170,8 +123,14 @@ const VoiceRegistration = () => {
           </Button>
         )}
 
+        {recordingState === "processing" && (
+          <p className="text-sm text-muted-foreground">
+            Processing voice…
+          </p>
+        )}
+
         {recordingState === "complete" && (
-          <Button onClick={handleContinue} className="w-full">
+          <Button onClick={() => navigate("/about")} className="w-full">
             Continue <ChevronRight className="ml-2" />
           </Button>
         )}

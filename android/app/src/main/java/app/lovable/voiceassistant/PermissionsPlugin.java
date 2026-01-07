@@ -1,9 +1,11 @@
 package app.lovable.voiceassistant;
 
 import android.Manifest;
-import android.content.pm.PackageManager;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
+import android.app.Activity;
+import android.app.admin.DevicePolicyManager;
+import android.content.ComponentName;
+import android.content.Intent;
+
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -95,4 +97,46 @@ public class PermissionsPlugin extends Plugin {
         result.put("granted", granted);
         call.resolve(result);
     }
+
+    // ✅ ONLY ADDITION — DEVICE ADMIN (NATIVE, CORRECT)
+    @PluginMethod
+    public void requestDeviceAdmin(PluginCall call) {
+        Activity activity = getActivity();
+
+        ComponentName adminComponent =
+            new ComponentName(activity, MyDeviceAdminReceiver.class);
+
+        Intent intent =
+            new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
+
+        intent.putExtra(
+            DevicePolicyManager.EXTRA_DEVICE_ADMIN,
+            adminComponent
+        );
+
+        intent.putExtra(
+            DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+            "Required to lock your phone using voice commands."
+        );
+
+        activity.startActivity(intent);
+        call.resolve();
+    }
+    @PluginMethod
+    public void isDeviceAdminEnabled(PluginCall call) {
+    Activity activity = getActivity();
+
+    DevicePolicyManager dpm =
+            (DevicePolicyManager) activity.getSystemService(Activity.DEVICE_POLICY_SERVICE);
+
+    ComponentName adminComponent =
+            new ComponentName(activity, MyDeviceAdminReceiver.class);
+
+    boolean enabled = dpm.isAdminActive(adminComponent);
+
+    JSObject result = new JSObject();
+    result.put("enabled", enabled);
+    call.resolve(result);
+}
+
 }
