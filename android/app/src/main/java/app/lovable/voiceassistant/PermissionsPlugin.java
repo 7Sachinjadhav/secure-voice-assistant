@@ -124,19 +124,43 @@ public class PermissionsPlugin extends Plugin {
     }
     @PluginMethod
     public void isDeviceAdminEnabled(PluginCall call) {
-    Activity activity = getActivity();
+        Activity activity = getActivity();
 
-    DevicePolicyManager dpm =
-            (DevicePolicyManager) activity.getSystemService(Activity.DEVICE_POLICY_SERVICE);
+        DevicePolicyManager dpm =
+                (DevicePolicyManager) activity.getSystemService(Activity.DEVICE_POLICY_SERVICE);
 
-    ComponentName adminComponent =
-            new ComponentName(activity, MyDeviceAdminReceiver.class);
+        ComponentName adminComponent =
+                new ComponentName(activity, MyDeviceAdminReceiver.class);
 
-    boolean enabled = dpm.isAdminActive(adminComponent);
+        boolean enabled = dpm.isAdminActive(adminComponent);
 
-    JSObject result = new JSObject();
-    result.put("enabled", enabled);
-    call.resolve(result);
-}
+        JSObject result = new JSObject();
+        result.put("enabled", enabled);
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void lockPhone(PluginCall call) {
+        Activity activity = getActivity();
+
+        DevicePolicyManager dpm =
+                (DevicePolicyManager) activity.getSystemService(Activity.DEVICE_POLICY_SERVICE);
+
+        ComponentName adminComponent =
+                new ComponentName(activity, MyDeviceAdminReceiver.class);
+
+        if (dpm.isAdminActive(adminComponent)) {
+            dpm.lockNow();
+            JSObject result = new JSObject();
+            result.put("success", true);
+            result.put("message", "Phone locked successfully");
+            call.resolve(result);
+        } else {
+            JSObject result = new JSObject();
+            result.put("success", false);
+            result.put("message", "Device admin not enabled");
+            call.reject("Device admin not enabled. Please enable it first.");
+        }
+    }
 
 }
