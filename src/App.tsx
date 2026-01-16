@@ -7,6 +7,7 @@ import Login from "./pages/Login";
 import Permissions from "./pages/Permissions";
 import VoiceRegistration from "./pages/VoiceRegistration";
 import About from "./pages/About";
+import VoiceCommand from "./pages/VoiceCommand";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/permissions" element={<Permissions />} />
           <Route path="/voice-registration" element={<VoiceRegistration />} />
           <Route path="/about" element={<About />} />
+          <Route path="/voice-command" element={<VoiceCommand />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </HashRouter>

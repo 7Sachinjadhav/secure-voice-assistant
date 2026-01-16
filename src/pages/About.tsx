@@ -153,16 +153,27 @@ const About = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
-            className="flex items-center justify-center gap-4 mt-6"
+            className="flex flex-col items-center gap-4 mt-6"
           >
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-success/20 border border-success/30">
-              <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
-              <span className="text-sm text-success">Voice Registered</span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-success/20 border border-success/30">
+                <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                <span className="text-sm text-success">Voice Registered</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 border border-primary/30">
+                <Shield className="w-4 h-4 text-primary" />
+                <span className="text-sm text-primary">Secured</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 border border-primary/30">
-              <Shield className="w-4 h-4 text-primary" />
-              <span className="text-sm text-primary">Secured</span>
-            </div>
+            
+            <Button 
+              onClick={() => navigate("/voice-command")}
+              size="lg"
+              className="mt-4 bg-gradient-to-r from-primary to-accent hover:opacity-90"
+            >
+              <Mic className="w-5 h-5 mr-2" />
+              Start Voice Control
+            </Button>
           </motion.div>
         </motion.section>
 
