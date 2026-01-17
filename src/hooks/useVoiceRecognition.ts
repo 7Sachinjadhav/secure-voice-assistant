@@ -46,21 +46,48 @@ export const useVoiceRecognition = (): UseVoiceRecognitionResult => {
   const [transcript, setTranscript] = useState("");
   const [interimTranscript, setInterimTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  const isSupported = typeof window !== "undefined" && 
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const shouldListenRef = useRef(false);
+  const restartTimerRef = useRef<number | null>(null);
+
+  const isSupported =
+    typeof window !== "undefined" &&
     (!!window.SpeechRecognition || !!window.webkitSpeechRecognition);
+
+  const clearRestartTimer = () => {
+    if (restartTimerRef.current) {
+      window.clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
+  };
+
+  const scheduleRestart = useCallback(() => {
+    if (!shouldListenRef.current || !recognitionRef.current) return;
+
+    clearRestartTimer();
+    // Android WebView/Chrome sometimes ends recognition after a short pause.
+    restartTimerRef.current = window.setTimeout(() => {
+      try {
+        recognitionRef.current?.start();
+      } catch {
+        // Ignore "start called twice" and similar transient errors.
+      }
+    }, 300);
+  }, []);
 
   useEffect(() => {
     if (!isSupported) return;
 
-    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognitionAPI =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
     recognitionRef.current = new SpeechRecognitionAPI();
-    
+
     const recognition = recognitionRef.current;
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = "en-US";
+    // Match your app language
+    recognition.lang = "en-IN";
 
     recognition.onstart = () => {
       setIsListening(true);
@@ -81,53 +108,70 @@ export const useVoiceRecognition = (): UseVoiceRecognitionResult => {
       }
 
       if (finalTranscript) {
-        setTranscript(prev => prev + " " + finalTranscript);
+        setTranscript((prev) => (prev + " " + finalTranscript).trim());
       }
-      setInterimTranscript(interimText);
+      setInterimTranscript(interimText.trim());
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error("Speech recognition error:", event.error);
       setError(event.error);
       setIsListening(false);
+
+      // If user expects continuous listening, try to recover.
+      if (shouldListenRef.current) {
+        scheduleRestart();
+      }
     };
 
     recognition.onend = () => {
       setIsListening(false);
       setInterimTranscript("");
+
+      // Keep listening unless user explicitly stopped.
+      if (shouldListenRef.current) {
+        scheduleRestart();
+      }
     };
 
     return () => {
+      clearRestartTimer();
+      shouldListenRef.current = false;
       if (recognition) {
         recognition.abort();
       }
     };
-  }, [isSupported]);
+  }, [isSupported, scheduleRestart]);
 
   const startListening = useCallback(() => {
-    if (!recognitionRef.current || isListening) return;
-    
+    if (!recognitionRef.current) return;
+
+    shouldListenRef.current = true;
+    clearRestartTimer();
     setTranscript("");
     setInterimTranscript("");
     setError(null);
-    
+
     try {
       recognitionRef.current.start();
     } catch (err) {
       console.error("Failed to start recognition:", err);
-      setError("Failed to start voice recognition");
+      // If it failed due to already-started state, let it continue.
     }
-  }, [isListening]);
+  }, []);
 
   const stopListening = useCallback(() => {
-    if (!recognitionRef.current || !isListening) return;
-    
+    if (!recognitionRef.current) return;
+
+    shouldListenRef.current = false;
+    clearRestartTimer();
+
     try {
       recognitionRef.current.stop();
     } catch (err) {
       console.error("Failed to stop recognition:", err);
     }
-  }, [isListening]);
+  }, []);
 
   const resetTranscript = useCallback(() => {
     setTranscript("");
