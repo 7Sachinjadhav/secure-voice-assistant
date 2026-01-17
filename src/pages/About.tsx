@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { 
-  Lock, 
-  Phone, 
-  MessageSquare, 
-  AppWindow, 
+import {
+  Lock,
+  Phone,
+  MessageSquare,
+  AppWindow,
   Camera,
   Shield,
   Mic,
@@ -18,18 +18,20 @@ import {
   Volume2,
   CheckCircle,
   XCircle,
-  Loader2
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useVoiceRecognition } from "@/hooks/useVoiceRecognition";
-import { 
-  containsWakeWord, 
-  parseVoiceCommand, 
+import { useAndroidWakeWordCommand } from "@/hooks/useAndroidWakeWordCommand";
+import {
+  containsWakeWord,
+  parseVoiceCommand,
   executeVoiceCommand,
-  VoiceCommand as VoiceCommandType
+  VoiceCommand as VoiceCommandType,
 } from "@/services/voiceCommand.service";
+
 
 const currentFeatures = [
   {
@@ -88,22 +90,34 @@ const About = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // Voice recognition
-  const {
-    isListening,
-    transcript,
-    interimTranscript,
-    error: voiceError,
-    isSupported,
-    startListening,
-    stopListening,
-    resetTranscript,
-  } = useVoiceRecognition();
+  // Web voice recognition (works in browsers, not reliable in Android WebView)
+  const webVoice = useVoiceRecognition();
 
   const [status, setStatus] = useState<CommandStatus>("idle");
   const [lastCommand, setLastCommand] = useState<VoiceCommandType | null>(null);
   const [commandResult, setCommandResult] = useState<string>("");
   const [wakeWordDetected, setWakeWordDetected] = useState(false);
+
+  // We need this indirection because native hook is created before processCommandFromTranscript is defined.
+  const androidCommandHandlerRef = useRef<(text: string) => void>(() => {});
+
+  // Android-native listener (reliable for the installed app)
+  const androidVoice = useAndroidWakeWordCommand((fullText) => {
+    androidCommandHandlerRef.current(fullText);
+  });
+
+  const isUsingAndroidNative = androidVoice.isSupported;
+
+  const isSupported = isUsingAndroidNative ? true : webVoice.isSupported;
+  const isListening = isUsingAndroidNative ? androidVoice.isListening : webVoice.isListening;
+  const transcript = isUsingAndroidNative ? androidVoice.lastHeard : webVoice.transcript;
+  const interimTranscript = isUsingAndroidNative ? "" : webVoice.interimTranscript;
+  const voiceError = isUsingAndroidNative ? null : webVoice.error;
+  const startListening = isUsingAndroidNative ? androidVoice.start : async () => webVoice.startListening();
+  const stopListening = isUsingAndroidNative ? androidVoice.stop : async () => webVoice.stopListening();
+  const resetTranscript = isUsingAndroidNative ? () => {} : webVoice.resetTranscript;
+
+
 
   useEffect(() => {
     // Check authentication
@@ -119,7 +133,7 @@ const About = () => {
   // Execute command from a given transcript
   const processCommandFromTranscript = useCallback(async (fullTranscript: string) => {
     if (!fullTranscript || status === "processing") return;
-    
+
     if (!containsWakeWord(fullTranscript)) {
       toast({
         title: "No Wake Word",
@@ -137,9 +151,9 @@ const About = () => {
 
     try {
       const result = await executeVoiceCommand(command);
-      
+
       console.log("Command result:", result);
-      
+
       if (result.success) {
         setStatus("success");
         setCommandResult(result.message);
@@ -176,15 +190,23 @@ const About = () => {
     }, 3000);
   }, [status, toast, resetTranscript]);
 
-  // Process transcript for wake word and commands - auto execute
+  // Wire native listener to the latest command processor
   useEffect(() => {
+    androidCommandHandlerRef.current = (text: string) => {
+      void processCommandFromTranscript(text);
+    };
+  }, [processCommandFromTranscript]);
+
+
+  // Web transcript processing (only when NOT using Android-native listener)
+  useEffect(() => {
+    if (isUsingAndroidNative) return;
+
     const fullTranscript = (transcript + " " + interimTranscript).trim();
-    
     if (!fullTranscript) return;
 
     console.log("Heard:", fullTranscript);
 
-    // Check for wake word
     if (containsWakeWord(fullTranscript)) {
       if (!wakeWordDetected) {
         setWakeWordDetected(true);
@@ -193,23 +215,36 @@ const About = () => {
           description: "Listening for your command...",
         });
       }
-      
-      // Check if we have a complete command (wake word + action)
+
       const lowerTranscript = fullTranscript.toLowerCase();
-      const hasLockCommand = lowerTranscript.includes("lock") && 
-        (lowerTranscript.includes("phone") || lowerTranscript.includes("device") || lowerTranscript.includes("screen"));
-      const hasCallCommand = lowerTranscript.includes("call ");
-      const hasMessageCommand = lowerTranscript.includes("message") || lowerTranscript.includes("send");
-      const hasOpenCommand = lowerTranscript.includes("open ");
-      
-      // Auto-execute if we detect a complete command
-      if ((hasLockCommand || hasCallCommand || hasMessageCommand || hasOpenCommand) && status !== "processing") {
+      const hasLockCommand =
+        lowerTranscript.includes("lock") &&
+        (lowerTranscript.includes("phone") ||
+          lowerTranscript.includes("device") ||
+          lowerTranscript.includes("screen"));
+
+      if (hasLockCommand && status !== "processing") {
         console.log("Auto-executing command:", fullTranscript);
-        stopListening();
-        processCommandFromTranscript(fullTranscript);
+        void stopListening();
+        void processCommandFromTranscript(fullTranscript);
       }
     }
-  }, [transcript, interimTranscript, wakeWordDetected, toast, status, stopListening, processCommandFromTranscript]);
+  }, [
+    isUsingAndroidNative,
+    transcript,
+    interimTranscript,
+    wakeWordDetected,
+    toast,
+    status,
+    stopListening,
+    processCommandFromTranscript,
+  ]);
+
+  // Sync wake-word flag from Android-native plugin
+  useEffect(() => {
+    if (!isUsingAndroidNative) return;
+    setWakeWordDetected(androidVoice.wakeWordDetected);
+  }, [isUsingAndroidNative, androidVoice.wakeWordDetected]);
 
   const handleMicToggle = () => {
     if (isListening) {
@@ -254,10 +289,10 @@ const About = () => {
 
   return (
     <div className="min-h-screen p-4 pb-20 relative overflow-hidden">
-      {/* Background effects */}
-      <div className="absolute inset-0 grid-pattern opacity-30" />
-      <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-accent/10 rounded-full blur-3xl" />
+      {/* Background effects (must not block touches) */}
+      <div className="absolute inset-0 grid-pattern opacity-30 pointer-events-none" />
+      <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-accent/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative z-10 max-w-4xl mx-auto">
         {/* Header */}
