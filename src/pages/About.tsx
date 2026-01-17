@@ -116,27 +116,9 @@ const About = () => {
     checkAuth();
   }, [navigate]);
 
-  // Process transcript for wake word and commands
-  useEffect(() => {
-    const fullTranscript = (transcript + " " + interimTranscript).trim();
-    
-    if (!fullTranscript) return;
-
-    // Check for wake word
-    if (containsWakeWord(fullTranscript) && !wakeWordDetected) {
-      setWakeWordDetected(true);
-      toast({
-        title: "🎤 Wake Word Detected!",
-        description: "Listening for your command...",
-      });
-    }
-  }, [transcript, interimTranscript, wakeWordDetected, toast]);
-
-  // Execute command when we have a complete phrase with wake word
-  const processCommand = useCallback(async () => {
-    if (!transcript || status === "processing") return;
-
-    const fullTranscript = transcript.trim();
+  // Execute command from a given transcript
+  const processCommandFromTranscript = useCallback(async (fullTranscript: string) => {
+    if (!fullTranscript || status === "processing") return;
     
     if (!containsWakeWord(fullTranscript)) {
       toast({
@@ -151,8 +133,12 @@ const About = () => {
     const command = parseVoiceCommand(fullTranscript);
     setLastCommand(command);
 
+    console.log("Processing command:", command);
+
     try {
       const result = await executeVoiceCommand(command);
+      
+      console.log("Command result:", result);
       
       if (result.success) {
         setStatus("success");
@@ -171,6 +157,7 @@ const About = () => {
         });
       }
     } catch (err) {
+      console.error("Command error:", err);
       setStatus("error");
       setCommandResult("An error occurred");
       toast({
@@ -187,14 +174,49 @@ const About = () => {
       resetTranscript();
       setCommandResult("");
     }, 3000);
-  }, [transcript, status, toast, resetTranscript]);
+  }, [status, toast, resetTranscript]);
+
+  // Process transcript for wake word and commands - auto execute
+  useEffect(() => {
+    const fullTranscript = (transcript + " " + interimTranscript).trim();
+    
+    if (!fullTranscript) return;
+
+    console.log("Heard:", fullTranscript);
+
+    // Check for wake word
+    if (containsWakeWord(fullTranscript)) {
+      if (!wakeWordDetected) {
+        setWakeWordDetected(true);
+        toast({
+          title: "🎤 Wake Word Detected!",
+          description: "Listening for your command...",
+        });
+      }
+      
+      // Check if we have a complete command (wake word + action)
+      const lowerTranscript = fullTranscript.toLowerCase();
+      const hasLockCommand = lowerTranscript.includes("lock") && 
+        (lowerTranscript.includes("phone") || lowerTranscript.includes("device") || lowerTranscript.includes("screen"));
+      const hasCallCommand = lowerTranscript.includes("call ");
+      const hasMessageCommand = lowerTranscript.includes("message") || lowerTranscript.includes("send");
+      const hasOpenCommand = lowerTranscript.includes("open ");
+      
+      // Auto-execute if we detect a complete command
+      if ((hasLockCommand || hasCallCommand || hasMessageCommand || hasOpenCommand) && status !== "processing") {
+        console.log("Auto-executing command:", fullTranscript);
+        stopListening();
+        processCommandFromTranscript(fullTranscript);
+      }
+    }
+  }, [transcript, interimTranscript, wakeWordDetected, toast, status, stopListening, processCommandFromTranscript]);
 
   const handleMicToggle = () => {
     if (isListening) {
       stopListening();
-      // Process the command when stopping
+      // Process the command when stopping manually
       if (transcript) {
-        processCommand();
+        processCommandFromTranscript(transcript);
       }
     } else {
       setStatus("listening");
