@@ -6,6 +6,11 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     androidScheme: 'https'
+  },
+  plugins: {
+    WakeWord: {
+      // Custom plugin registration
+    }
   }
 };
 

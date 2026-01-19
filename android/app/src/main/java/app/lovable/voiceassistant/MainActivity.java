@@ -8,6 +8,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         // Register the custom permissions plugin
         registerPlugin(PermissionsPlugin.class);
+        registerPlugin(VoiceServicePlugin.class);
+        registerPlugin(WakeWordPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

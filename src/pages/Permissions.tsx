@@ -25,6 +25,10 @@ interface Permission {
   androidPermissions?: string[];
 }
 
+interface PermissionsProps {
+  onPermissionsGranted?: () => void;
+}
+
 const initialPermissions: Permission[] = [
   {
     id: "microphone",
@@ -114,7 +118,7 @@ const requestAndroidPermission = async (permissionType: string): Promise<boolean
   }
 };
 
-const Permissions = () => {
+const Permissions = ({ onPermissionsGranted }: PermissionsProps) => {
   const navigate = useNavigate();
   const [permissions, setPermissions] = useState<Permission[]>(initialPermissions);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -188,10 +192,23 @@ const Permissions = () => {
 
   setIsGranting(false);
 };
+const startVoiceService = async () => {
+  const VoiceService =
+    (window as any).Capacitor?.Plugins?.VoiceServicePlugin;
+
+  if (!VoiceService) {
+    console.log("VoiceServicePlugin not ready");
+    return;
+  }
+
+  await VoiceService.startCommandListener();
+};
+
 
 
 
   const handleContinue = () => {
+    onPermissionsGranted?.();
     navigate("/voice-registration");
   };
 

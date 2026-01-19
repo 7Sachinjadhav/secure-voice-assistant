@@ -7,7 +7,11 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
-const Login = () => {
+interface LoginProps {
+  onAuthReady?: () => void;
+}
+
+const Login = ({ onAuthReady }: LoginProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);

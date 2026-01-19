@@ -74,6 +74,8 @@ const About = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  console.log("[ABOUT] Component rendered - native listener should be active");
+
   useEffect(() => {
     // Check authentication
     const checkAuth = async () => {

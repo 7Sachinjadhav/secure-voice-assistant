@@ -4,10 +4,20 @@ import { Mic, CheckCircle2, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Capacitor, registerPlugin } from "@capacitor/core";
+
+// Register the WakeWord plugin
+const WakeWord = registerPlugin("WakeWord", {
+  web: () => import("./wakeWordWeb").then(m => new m.WakeWordWeb()),
+});
 
 type RecordingState = "idle" | "recording" | "processing" | "complete";
 
-const VoiceRegistration = () => {
+interface VoiceRegistrationProps {
+  onRegistrationComplete?: () => void;
+}
+
+const VoiceRegistration = ({ onRegistrationComplete }: VoiceRegistrationProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [recordingState, setRecordingState] =
@@ -42,52 +52,114 @@ const VoiceRegistration = () => {
 
       recognition.lang = "en-IN";
       recognition.interimResults = false;
-      recognition.continuous = false; // ✅ SAME AS YESTERDAY
+      recognition.continuous = false;
 
       setRecordingState("recording");
 
+      console.log("[REGISTRATION] Recording started...");
+
       recognition.onresult = (event: any) => {
-        const text = event.results[0][0].transcript
-          .toLowerCase()
-          .trim();
+        try {
+          console.log("[REGISTRATION] onresult fired, isFinal:", event.results[event.results.length - 1].isFinal);
+          
+          // ONLY process final results
+          if (!event.results[event.results.length - 1].isFinal) {
+            console.log("[REGISTRATION] Interim result, skipping...");
+            return;
+          }
 
-        console.log("Heard:", text);
+          const text = event.results[0][0].transcript
+            .toLowerCase()
+            .trim();
 
-        if (text.includes("hey sri")) {
-          recognition.stop();
-          setRecordingState("processing");
+          console.log("[REGISTRATION] Heard:", text);
 
-          setTimeout(() => {
+          // SIMPLIFIED: Just check if it contains "sri" (since "hey sri" sometimes appears as parts)
+          const isSri = text.includes("sri");
+          console.log("[REGISTRATION] Contains 'sri'?:", isSri);
+
+          if (isSri) {
+            console.log("\n\n✅✅✅ HOTWORD MATCHED - Starting native plugin ✅✅✅");
+            recognition.stop();
+            setRecordingState("processing");
+
+            setTimeout(() => {
+              toast({
+                title: "Voice Registered",
+                description: 'Wake word detected successfully.',
+              });
+              setRecordingState("complete");
+              
+              localStorage.setItem("appReady", "true");
+              console.log("[REGISTRATION] Calling native plugin start...");
+              startNativeWakeWordListener();
+              onRegistrationComplete?.();
+            }, 800);
+          } else {
+            recognition.stop();
             toast({
-              title: "Voice Registered",
-              description: 'Wake word "Hey Sri" detected successfully.',
+              variant: "destructive",
+              title: "Try again",
+              description: 'Please say "Hey Sri" clearly',
             });
-            setRecordingState("complete");
-          }, 800);
-        } else {
-          recognition.stop();
-          toast({
-            variant: "destructive",
-            title: "Try again",
-            description: 'Please say "Hey Sri" clearly',
-          });
-          setRecordingState("idle");
+            setRecordingState("idle");
+          }
+        } catch (error) {
+          console.error("[REGISTRATION] ERROR IN CALLBACK:", error);
+          console.error("[REGISTRATION] Stack:", (error as any)?.stack);
         }
       };
 
-      recognition.onerror = () => {
+      recognition.onerror = (event: any) => {
+        console.error("[REGISTRATION] Recognition error:", event.error);
         setRecordingState("idle");
       };
 
       recognition.start();
     } catch (err) {
-      console.error(err);
+      console.error("[REGISTRATION] Error:", err);
       toast({
         variant: "destructive",
         title: "Microphone Error",
         description: "Speech recognition failed.",
       });
       setRecordingState("idle");
+    }
+  };
+
+  const handleNavigate = () => {
+    console.log("[REGISTRATION] Navigating to /about");
+    navigate("/about");
+  };
+
+  const startNativeWakeWordListener = async () => {
+    console.log("\n\n🔥🔥🔥 [NATIVE] startNativeWakeWordListener() CALLED 🔥🔥🔥\n");
+    
+    try {
+      console.log("[NATIVE] Step 1: Checking if native platform");
+      if (!Capacitor.isNativePlatform()) {
+        console.log("[NATIVE] ❌ Not native platform");
+        return;
+      }
+
+      console.log("[NATIVE] ✓ Is native platform");
+      console.log("[NATIVE] Step 2: Getting WakeWord plugin");
+
+      console.log("[NATIVE] WakeWord:", WakeWord ? "FOUND" : "NOT FOUND");
+
+      if (!WakeWord) {
+        console.error("[NATIVE] ❌ WakeWord plugin is undefined!");
+        return;
+      }
+
+      console.log("[NATIVE] ✓ WakeWord found");
+      console.log("[NATIVE] Step 3: Calling WakeWord.startListening()");
+
+      const result = await (WakeWord as any).startListening?.();
+      console.log("[NATIVE] ✓✓✓ startListening() returned:", result);
+      console.log("[NATIVE] 🎤 Native plugin STARTED and LISTENING");
+    } catch (error) {
+      console.error("[NATIVE] ❌ EXCEPTION:", error);
     }
   };
 
@@ -130,9 +202,15 @@ const VoiceRegistration = () => {
         )}
 
         {recordingState === "complete" && (
-          <Button onClick={() => navigate("/about")} className="w-full">
+          <Button onClick={handleNavigate} className="w-full">
             Continue <ChevronRight className="ml-2" />
           </Button>
+        )}
+
+        {recordingState === "recording" && (
+          <p className="text-sm text-primary font-medium">
+            Listening... Say "Hey Sri"
+          </p>
         )}
       </div>
     </div>

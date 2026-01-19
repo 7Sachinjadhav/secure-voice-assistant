@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- 🔥 ADDED: Foreground service permission -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
     <!-- 🔴 REQUIRED FOR WEBVIEW MIC -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
@@ -27,7 +30,7 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
-        <!-- ✅ DEVICE ADMIN RECEIVER (FIXED POSITION) -->
+        <!-- ✅ DEVICE ADMIN RECEIVER (UNCHANGED) -->
         <receiver
             android:name=".MyDeviceAdminReceiver"
             android:permission="android.permission.BIND_DEVICE_ADMIN"
@@ -41,6 +44,13 @@
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>
         </receiver>
+
+        <!-- 🔥 ADDED: Foreground Voice Assistant Service -->
+        <service
+            android:name=".VoiceAssistantService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <activity
             android:name=".MainActivity"
