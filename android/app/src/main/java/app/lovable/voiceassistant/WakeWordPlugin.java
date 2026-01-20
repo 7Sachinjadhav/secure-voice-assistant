@@ -25,7 +25,11 @@ public class WakeWordPlugin extends Plugin {
     private SpeechRecognizer speechRecognizer;
     private Intent recognizerIntent;
     private Handler mainHandler;
+
+    // Guard against duplicate startListening/restart calls
     private boolean isListening = false;
+    private boolean isStarting = false;
+    private Runnable restartRunnable;
 
     @Override
     public void load() {
@@ -45,6 +49,13 @@ public class WakeWordPlugin extends Plugin {
                     return;
                 }
 
+                // Prevent duplicate starts which commonly cause ERROR_CLIENT (5)
+                if (isListening || isStarting) {
+                    System.out.println("[WakeWordPlugin] ℹ️ Already listening/starting - ignoring duplicate start");
+                    call.resolve();
+                    return;
+                }
+
                 System.out.println("[WakeWordPlugin] ✓ Speech recognition available");
                 initializeSpeechRecognizer();
                 call.resolve();
@@ -57,12 +68,24 @@ public class WakeWordPlugin extends Plugin {
     }
 
     private void initializeSpeechRecognizer() {
+        // Cancel any pending restarts
+        if (restartRunnable != null) {
+            mainHandler.removeCallbacks(restartRunnable);
+        }
+
+        isListening = false;
+        isStarting = false;
+
         if (speechRecognizer != null) {
+            try {
+                speechRecognizer.cancel();
+            } catch (Exception ignored) {}
             speechRecognizer.destroy();
+            speechRecognizer = null;
         }
 
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(getContext());
-        
+
         recognizerIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN");
@@ -72,6 +95,7 @@ public class WakeWordPlugin extends Plugin {
         speechRecognizer.setRecognitionListener(new RecognitionListener() {
             @Override
             public void onReadyForSpeech(Bundle params) {
+                isStarting = false;
                 isListening = true;
                 System.out.println("[WakeWordPlugin] 🎤 Ready to listen - say 'hey sri lock my phone'");
             }
@@ -96,34 +120,40 @@ public class WakeWordPlugin extends Plugin {
             @Override
             public void onError(int error) {
                 isListening = false;
+                isStarting = false;
+
                 String errorMsg = getErrorMessage(error);
                 System.out.println("[WakeWordPlugin] ⚠️ Error " + error + ": " + errorMsg);
-                
-                // Restart after a delay (don't block UI thread)
-                scheduleRestart(1500);
+
+                // ERROR_CLIENT (5) is commonly caused by duplicate/overlapping startListening calls.
+                // We guard above, and for safety we fully cancel + restart with a slightly longer delay.
+                int delay = (error == SpeechRecognizer.ERROR_CLIENT) ? 2000 : 1200;
+                scheduleRestart(delay, error);
             }
 
             @Override
             public void onResults(Bundle results) {
                 isListening = false;
+                isStarting = false;
+
                 ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                
+
                 if (matches != null && !matches.isEmpty()) {
                     System.out.println("[WakeWordPlugin] 📝 Results: " + matches.toString());
-                    
+
                     for (String text : matches) {
                         String lowerText = text.toLowerCase();
                         System.out.println("[WakeWordPlugin] Checking: '" + lowerText + "'");
-                        
+
                         // Check for wake word and lock command
                         if (lowerText.contains("hey") && lowerText.contains("sri")) {
                             System.out.println("[WakeWordPlugin] ✓ Wake word detected!");
-                            
+
                             // Notify JavaScript
                             JSObject data = new JSObject();
                             data.put("command", lowerText);
                             notifyListeners("commandDetected", data);
-                            
+
                             // Check for lock command
                             if (lowerText.contains("lock")) {
                                 System.out.println("[WakeWordPlugin] 🔒 LOCK COMMAND - Locking phone NOW!");
@@ -135,9 +165,9 @@ public class WakeWordPlugin extends Plugin {
                 } else {
                     System.out.println("[WakeWordPlugin] No matches received");
                 }
-                
+
                 // Restart listening
-                scheduleRestart(500);
+                scheduleRestart(700, -1);
             }
 
             @Override
@@ -153,17 +183,56 @@ public class WakeWordPlugin extends Plugin {
         });
 
         // Start listening
-        speechRecognizer.startListening(recognizerIntent);
-        System.out.println("[WakeWordPlugin] 🎤 Started listening...");
+        startListeningSafely("init");
     }
 
-    private void scheduleRestart(int delayMs) {
-        mainHandler.postDelayed(() -> {
-            if (speechRecognizer != null) {
-                System.out.println("[WakeWordPlugin] 🔄 Restarting...");
-                speechRecognizer.startListening(recognizerIntent);
+    private void startListeningSafely(String reason) {
+        if (speechRecognizer == null || recognizerIntent == null) return;
+        if (isListening || isStarting) {
+            System.out.println("[WakeWordPlugin] ℹ️ startListeningSafely(" + reason + ") skipped (already listening/starting)");
+            return;
+        }
+
+        try {
+            isStarting = true;
+            try {
+                // Cancel any previous session; helps reduce ERROR_CLIENT(5)
+                speechRecognizer.cancel();
+            } catch (Exception ignored) {}
+
+            speechRecognizer.startListening(recognizerIntent);
+            System.out.println("[WakeWordPlugin] 🎤 Started listening (" + reason + ")...");
+        } catch (Exception e) {
+            isStarting = false;
+            System.out.println("[WakeWordPlugin] ❌ startListeningSafely(" + reason + ") failed: " + e.getMessage());
+            scheduleRestart(2000, SpeechRecognizer.ERROR_CLIENT);
+        }
+    }
+
+    private void scheduleRestart(int delayMs, int lastError) {
+        if (restartRunnable != null) {
+            mainHandler.removeCallbacks(restartRunnable);
+        }
+
+        restartRunnable = () -> {
+            if (speechRecognizer == null) return;
+            if (isListening || isStarting) {
+                System.out.println("[WakeWordPlugin] 🔁 Restart skipped (still listening/starting)");
+                return;
             }
-        }, delayMs);
+
+            // For persistent client errors, re-initialize from scratch
+            if (lastError == SpeechRecognizer.ERROR_CLIENT) {
+                System.out.println("[WakeWordPlugin] 🔄 Reinitializing after ERROR_CLIENT...");
+                initializeSpeechRecognizer();
+                return;
+            }
+
+            System.out.println("[WakeWordPlugin] 🔄 Restarting...");
+            startListeningSafely("restart");
+        };
+
+        mainHandler.postDelayed(restartRunnable, delayMs);
     }
 
     private String getErrorMessage(int error) {
@@ -207,12 +276,22 @@ public class WakeWordPlugin extends Plugin {
 
     @PluginMethod
     public void stopListening(PluginCall call) {
+        if (restartRunnable != null) {
+            mainHandler.removeCallbacks(restartRunnable);
+            restartRunnable = null;
+        }
+
         if (speechRecognizer != null) {
+            try {
+                speechRecognizer.cancel();
+            } catch (Exception ignored) {}
             speechRecognizer.stopListening();
             speechRecognizer.destroy();
             speechRecognizer = null;
         }
+
         isListening = false;
+        isStarting = false;
         if (call != null) call.resolve();
     }
 }
