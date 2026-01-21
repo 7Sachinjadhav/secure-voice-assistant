@@ -50,6 +50,9 @@ const VoiceRegistration = ({ onRegistrationComplete }: VoiceRegistrationProps) =
       const recognition = new SpeechRecognition();
       recognitionRef.current = recognition;
 
+      // Guard: ensure we only kick off native listening once (prevents overlapping mic usage)
+      let nativeStartQueued = false;
+
       recognition.lang = "en-IN";
       recognition.interimResults = false;
       recognition.continuous = false;
@@ -80,21 +83,22 @@ const VoiceRegistration = ({ onRegistrationComplete }: VoiceRegistrationProps) =
 
           if (isSri) {
             console.log("\n\n✅✅✅ HOTWORD MATCHED - Starting native plugin ✅✅✅");
-            recognition.stop();
-            setRecordingState("processing");
+            nativeStartQueued = true;
 
-            setTimeout(() => {
-              toast({
-                title: "Voice Registered",
-                description: 'Wake word detected successfully.',
-              });
-              setRecordingState("complete");
-              
-              localStorage.setItem("appReady", "true");
-              console.log("[REGISTRATION] Calling native plugin start...");
-              startNativeWakeWordListener();
-              onRegistrationComplete?.();
-            }, 800);
+            // Important: release the Web Speech mic first, otherwise Android native SpeechRecognizer
+            // can immediately fail with ERROR_CLIENT (5) due to audio focus/mic contention.
+            try {
+              recognition.onresult = null;
+              recognition.onerror = null;
+              recognition.onend = null;
+              // abort() is more aggressive than stop() and releases audio faster on Android WebView
+              recognition.abort?.();
+            } catch {
+              // fallback
+              recognition.stop();
+            }
+
+            setRecordingState("processing");
           } else {
             recognition.stop();
             toast({
@@ -107,6 +111,33 @@ const VoiceRegistration = ({ onRegistrationComplete }: VoiceRegistrationProps) =
         } catch (error) {
           console.error("[REGISTRATION] ERROR IN CALLBACK:", error);
           console.error("[REGISTRATION] Stack:", (error as any)?.stack);
+        }
+      };
+
+      recognition.onend = async () => {
+        // If we matched the hotword, wait until the Web recognizer is fully ended,
+        // then start the native recognizer.
+        if (!nativeStartQueued) return;
+        nativeStartQueued = false;
+
+        console.log("[REGISTRATION] Web recognizer ended; starting native plugin...");
+
+        try {
+          // Small delay helps on some devices to fully release the mic
+          await new Promise((r) => setTimeout(r, 350));
+
+          toast({
+            title: "Voice Registered",
+            description: "Wake word detected successfully.",
+          });
+
+          setRecordingState("complete");
+          localStorage.setItem("appReady", "true");
+          startNativeWakeWordListener();
+          onRegistrationComplete?.();
+        } catch (e) {
+          console.error("[REGISTRATION] Failed to start native listener:", e);
+          setRecordingState("idle");
         }
       };
 
