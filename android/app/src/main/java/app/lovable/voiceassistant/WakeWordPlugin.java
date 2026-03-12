@@ -27,22 +27,22 @@ public class WakeWordPlugin extends Plugin {
 
     @PluginMethod
     public void startListening(PluginCall call) {
-        System.out.println("\n\n==== [WakeWordPlugin] startListening() CALLED ====\n");
+        System.out.println("\n\n==== [WakeWordPlugin] startListening() CALLED ====\n\n");
 
         getActivity().runOnUiThread(() -> {
             try {
                 if (!SpeechRecognizer.isRecognitionAvailable(getContext())) {
-                    System.out.println("[WakeWordPlugin] ❌ Speech recognition NOT available");
+                    System.out.println("[WakeWordPlugin] ? Speech recognition NOT available");
                     call.reject("Speech recognition not available");
                     return;
                 }
 
-                System.out.println("[WakeWordPlugin] ✓ Speech recognition available");
+                System.out.println("[WakeWordPlugin] ? Speech recognition available");
                 startWakeWordListener();
                 System.out.println("==== [WakeWordPlugin] Setup Complete ====\n");
                 call.resolve();
             } catch (Exception e) {
-                System.out.println("[WakeWordPlugin] ❌ EXCEPTION: " + e.getMessage());
+                System.out.println("[WakeWordPlugin] ? EXCEPTION: " + e.getMessage());
                 e.printStackTrace();
                 call.reject("Error: " + e.getMessage());
             }
@@ -59,18 +59,18 @@ public class WakeWordPlugin extends Plugin {
 
         wakeRecognizer.setRecognitionListener(new RecognitionListener() {
             @Override public void onReadyForSpeech(Bundle params) {
-                System.out.println("[WakeWordPlugin] 🎤 Wake listener ready");
+                System.out.println("[WakeWordPlugin] ?? Wake listener ready");
             }
             @Override public void onBeginningOfSpeech() {
-                System.out.println("[WakeWordPlugin] 🎵 Wake speech detected");
+                System.out.println("[WakeWordPlugin] ?? Wake speech detected");
             }
             @Override public void onRmsChanged(float rmsdB) {}
             @Override public void onBufferReceived(byte[] buffer) {}
             @Override public void onEndOfSpeech() {
-                System.out.println("[WakeWordPlugin] 🛑 Wake speech ended");
+                System.out.println("[WakeWordPlugin] ?? Wake speech ended");
             }
             @Override public void onError(int error) {
-                System.out.println("[WakeWordPlugin] ❌ Wake error: " + error);
+                System.out.println("[WakeWordPlugin] ? Wake error: " + error);
                 if (error == 7) {
                     restartWakeListener();
                 }
@@ -83,10 +83,10 @@ public class WakeWordPlugin extends Plugin {
                     String heard = matches.get(0).toLowerCase();
                     System.out.println("[WakeWordPlugin] Wake heard: '" + heard + "'");
                     
-                    if (heard.contains("hey sri") || heard.equals("sri")) {
-                        System.out.println("[WakeWordPlugin] ✓✓✓ HOTWORD DETECTED!");
+                    if (heard.contains("hey buddy") || heard.equals("buddy")) {
+                        System.out.println("[WakeWordPlugin] ??? HOTWORD DETECTED!");
                         if (heard.contains("lock")) {
-                            System.out.println("[WakeWordPlugin] 🔒 LOCK DETECTED IN WAKE - LOCKING NOW");
+                            System.out.println("[WakeWordPlugin] ?? LOCK DETECTED IN WAKE - LOCKING NOW");
                             JSObject data = new JSObject();
                             data.put("command", "lock");
                             notifyListeners("commandDetected", data);
@@ -147,18 +147,18 @@ public class WakeWordPlugin extends Plugin {
 
         commandRecognizer.setRecognitionListener(new RecognitionListener() {
             @Override public void onReadyForSpeech(Bundle params) {
-                System.out.println("[WakeWordPlugin] 🎤 Command listener ready - WAITING 5 SECONDS");
+                System.out.println("[WakeWordPlugin] ?? Command listener ready - WAITING 5 SECONDS");
             }
             @Override public void onBeginningOfSpeech() {
-                System.out.println("[WakeWordPlugin] 🎵 Command speech detected");
+                System.out.println("[WakeWordPlugin] ?? Command speech detected");
             }
             @Override public void onRmsChanged(float rmsdB) {}
             @Override public void onBufferReceived(byte[] buffer) {}
             @Override public void onEndOfSpeech() {
-                System.out.println("[WakeWordPlugin] 🛑 Command speech ended");
+                System.out.println("[WakeWordPlugin] ?? Command speech ended");
             }
             @Override public void onError(int error) {
-                System.out.println("[WakeWordPlugin] ❌ Command error: " + error);
+                System.out.println("[WakeWordPlugin] ? Command error: " + error);
                 startWakeWordListener();
             }
             @Override
@@ -169,7 +169,7 @@ public class WakeWordPlugin extends Plugin {
                     System.out.println("[WakeWordPlugin] Command heard: '" + heard + "'");
                     
                     if (heard.contains("lock")) {
-                        System.out.println("[WakeWordPlugin] 🔒 LOCK DETECTED - LOCKING NOW");
+                        System.out.println("[WakeWordPlugin] ?? LOCK DETECTED - LOCKING NOW");
                         JSObject data = new JSObject();
                         data.put("command", "lock");
                         notifyListeners("commandDetected", data);
@@ -198,10 +198,10 @@ public class WakeWordPlugin extends Plugin {
         System.out.println("[WakeWordPlugin] Device admin active: " + isAdminActive);
 
         if (isAdminActive) {
-            System.out.println("[WakeWordPlugin] ✓ LOCKING DEVICE NOW");
+            System.out.println("[WakeWordPlugin] ? LOCKING DEVICE NOW");
             dpm.lockNow();
         } else {
-            System.out.println("[WakeWordPlugin] ❌ Device Admin not active - cannot lock");
+            System.out.println("[WakeWordPlugin] ? Device Admin not active - cannot lock");
         }
     }
 
@@ -210,13 +210,11 @@ public class WakeWordPlugin extends Plugin {
         if (wakeRecognizer != null) {
             wakeRecognizer.stopListening();
             wakeRecognizer.destroy();
-            wakeRecognizer = null;
         }
         if (commandRecognizer != null) {
             commandRecognizer.stopListening();
             commandRecognizer.destroy();
-            commandRecognizer = null;
         }
-        if (call != null) call.resolve();
+        call.resolve();
     }
 }

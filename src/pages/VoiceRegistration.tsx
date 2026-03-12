@@ -61,7 +61,6 @@ const VoiceRegistration = ({ onRegistrationComplete }: VoiceRegistrationProps) =
       recognition.onresult = (event: any) => {
         try {
           console.log("[REGISTRATION] onresult fired, isFinal:", event.results[event.results.length - 1].isFinal);
-          
           // ONLY process final results
           if (!event.results[event.results.length - 1].isFinal) {
             console.log("[REGISTRATION] Interim result, skipping...");
@@ -74,11 +73,10 @@ const VoiceRegistration = ({ onRegistrationComplete }: VoiceRegistrationProps) =
 
           console.log("[REGISTRATION] Heard:", text);
 
-          // SIMPLIFIED: Just check if it contains "sri" (since "hey sri" sometimes appears as parts)
-          const isSri = text.includes("sri");
-          console.log("[REGISTRATION] Contains 'sri'?:", isSri);
+          const isBuddy = text.includes("buddy");
+          console.log("[REGISTRATION] Contains 'buddy'?:", isBuddy);
 
-          if (isSri) {
+          if (isBuddy) {
             console.log("\n\n✅✅✅ HOTWORD MATCHED - Starting native plugin ✅✅✅");
             recognition.stop();
             setRecordingState("processing");
@@ -89,7 +87,6 @@ const VoiceRegistration = ({ onRegistrationComplete }: VoiceRegistrationProps) =
                 description: 'Wake word detected successfully.',
               });
               setRecordingState("complete");
-              
               localStorage.setItem("appReady", "true");
               console.log("[REGISTRATION] Calling native plugin start...");
               startNativeWakeWordListener();
@@ -100,7 +97,7 @@ const VoiceRegistration = ({ onRegistrationComplete }: VoiceRegistrationProps) =
             toast({
               variant: "destructive",
               title: "Try again",
-              description: 'Please say "Hey Sri" clearly',
+              description: 'Please say "Hey Buddy" clearly',
             });
             setRecordingState("idle");
           }
@@ -170,7 +167,7 @@ const VoiceRegistration = ({ onRegistrationComplete }: VoiceRegistrationProps) =
 
         <p className="text-muted-foreground mb-6">
           You are the owner of this device. Say{" "}
-          <span className="font-semibold text-primary">“Hey Sri”</span>
+          <span className="font-semibold text-primary">“Hey Buddy”</span>
         </p>
 
         <div className="flex justify-center mb-6">
@@ -209,7 +206,7 @@ const VoiceRegistration = ({ onRegistrationComplete }: VoiceRegistrationProps) =
 
         {recordingState === "recording" && (
           <p className="text-sm text-primary font-medium">
-            Listening... Say "Hey Sri"
+            Listening... Say "Hey Buddy"
           </p>
         )}
       </div>

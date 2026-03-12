@@ -77,7 +77,7 @@ public class VoiceAssistantService extends Service {
                         Log.d("VOICE", "Wake heard: " + text);
                         text = text.toLowerCase();
 
-                        if (text.contains("hey sri")) {
+                        if (text.contains("hey buddy")) {
                             startCommandListener();
                             return;
                         }
@@ -197,8 +197,8 @@ public class VoiceAssistantService extends Service {
     // =========================
     private Notification getNotification() {
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Sri Voice Assistant")
-                .setContentText("Listening for 'Hey Sri'")
+                .setContentTitle("Buddy Voice Assistant")
+                .setContentText("Listening for 'Hey Buddy'")
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setOngoing(true)
                 .build();

@@ -19,7 +19,7 @@ export interface UseSpeechEngineOptions {
 
 export function useSpeechEngine(options: UseSpeechEngineOptions = {}) {
   const {
-    hotword = "hey sri",
+    hotword = "hey buddy",
     lang = "en-IN",
     autoStart = true,
     onCommandDetected,

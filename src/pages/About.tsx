@@ -215,10 +215,10 @@ const About = () => {
             <h3 className="text-lg font-bold mb-4">Try These Commands</h3>
             <div className="grid gap-3 md:grid-cols-2">
               {[
-                '"Hey Sri, lock my phone"',
-                '"Hey Sri, call Mom"',
-                '"Hey Sri, send message to John"',
-                '"Hey Sri, open Camera"',
+                '"Hey Buddy, lock my phone"',
+                '"Hey Buddy, call Mom"',
+                '"Hey Buddy, send message to John"',
+                '"Hey Buddy, open Camera"',
               ].map((command, index) => (
                 <motion.div
                   key={command}

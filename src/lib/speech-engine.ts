@@ -2,7 +2,7 @@
  * Speech Engine - Global continuous hotword listening with command recognition
  * 
  * States:
- * HOTWORD -> Listening for "hey sri"
+ * HOTWORD -> Listening for "hey buddy"
  * COMMAND -> Listening for command after hotword detected (no need to repeat hotword)
  */
 
