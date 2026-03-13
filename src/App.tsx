@@ -71,18 +71,36 @@ const AppContent = () => {
     setupNativeListener();
   }, []);
 
-  // Check if app is ready (registration complete)
+  // Check if app is ready (registration complete) and start native listening
   useEffect(() => {
-    const checkReady = () => {
+    const startNativeListening = async () => {
       const isReady = localStorage.getItem("appReady") === "true";
       console.log("[APP] App ready:", isReady);
+
+      if (!isReady) {
+        console.log("[APP] App not ready yet, skipping native listening start");
+        return;
+      }
+
+      if (!Capacitor.isNativePlatform()) {
+        console.log("[APP] Not on native platform, skipping native listening start");
+        return;
+      }
+
+      try {
+        console.log("[APP] Starting native WakeWord listening...");
+        await (WakeWord as any).startListening?.();
+        console.log("[APP] ✓ Native listening started successfully");
+      } catch (error) {
+        console.error("[APP] ❌ Failed to start native listening:", error);
+      }
     };
 
-    checkReady();
-    window.addEventListener("storage", checkReady);
+    startNativeListening();
+    window.addEventListener("storage", startNativeListening);
 
     return () => {
-      window.removeEventListener("storage", checkReady);
+      window.removeEventListener("storage", startNativeListening);
     };
   }, []);
 

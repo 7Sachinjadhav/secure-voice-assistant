@@ -3,6 +3,7 @@
 
     <!-- 🔥 ADDED: Foreground service permission -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- 🔴 REQUIRED FOR WEBVIEW MIC -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
@@ -42,6 +43,16 @@
 
             <intent-filter>
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 🔥 BOOT RECEIVER: Start service when device boots -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
 
